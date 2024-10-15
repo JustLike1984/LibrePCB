@@ -29,13 +29,16 @@
 
 #include <librepcb/core/fileio/filepath.h>
 #include <librepcb/core/project/board/board.h>
+#include <librepcb/core/project/board/boardplanefragmentsbuilder.h>
 #include <librepcb/core/project/project.h>
 #include <librepcb/core/project/schematic/schematic.h>
 #include <librepcb/core/workspace/workspace.h>
 #include <librepcb/core/workspace/workspacesettings.h>
+#include <librepcb/editor/3d/openglscenebuilder.h>
 #include <librepcb/editor/graphics/defaultgraphicslayerprovider.h>
 #include <librepcb/editor/project/boardeditor/boardgraphicsscene.h>
 #include <librepcb/editor/project/schematiceditor/schematicgraphicsscene.h>
+#include <librepcb/editor/widgets/openglview.h>
 #include <librepcb/editor/workspace/desktopservices.h>
 
 #include <QtCore>
@@ -59,6 +62,7 @@ MainWindow::MainWindow(GuiApplication& app,
     mWindow(win),
     mGlobals(mWindow->global<ui::Globals>()),
     mIndex(index),
+    mPlaneBuilder(new BoardPlaneFragmentsBuilder(false, this)),
     mLayerProvider(new DefaultGraphicsLayerProvider(
         app.getWorkspace().getSettings().themes.getActive())),
     mTabs({
@@ -66,13 +70,16 @@ MainWindow::MainWindow(GuiApplication& app,
         std::make_shared<slint::VectorModel<ui::Tab>>(),
     }),
     mScenes({nullptr, nullptr}),
+    m3dViews({nullptr, nullptr}),
+    m3dSceneBuilders({nullptr, nullptr}),
     mOldTransforms({{}, {}}),
     mTransforms({{}, {}}),
     mMoving({false, false}) {
   // Set initial data.
   mGlobals.set_current_project(ui::ProjectData{});
-  mGlobals.set_tab_index_left(-1);
-  mGlobals.set_tab_index_right(-1);
+  mGlobals.set_section_left(ui::SectionData{0, -1, slint::Brush()});
+  mGlobals.set_section_right(ui::SectionData{1, -1, slint::Brush()});
+  mWindow->set_cursor_coordinate(slint::SharedString());
 
   // Register global callbacks.
   mGlobals.on_project_item_doubleclicked(std::bind(
@@ -81,6 +88,8 @@ MainWindow::MainWindow(GuiApplication& app,
                                           this, std::placeholders::_1));
   mGlobals.on_board_clicked(
       std::bind(&MainWindow::boardItemClicked, this, std::placeholders::_1));
+  mGlobals.on_board_3d_clicked(
+      std::bind(&MainWindow::board3dItemClicked, this, std::placeholders::_1));
   mGlobals.on_tab_clicked(std::bind(&MainWindow::tabClicked, this,
                                     std::placeholders::_1,
                                     std::placeholders::_2));
@@ -162,7 +171,17 @@ void MainWindow::boardItemClicked(int index) noexcept {
   auto section = (mTabs[0]->row_count() + mTabs[1]->row_count()) % 2;
   if (auto obj = mProject->getProject().getBoardByIndex(index)) {
     mTabs[section]->push_back(
-        ui::Tab{ui::TabType::Board, index, q2s(*obj->getName())});
+        ui::Tab{ui::TabType::Board2d, index, q2s(*obj->getName())});
+    tabClicked(section, mTabs[section]->row_count() - 1);
+  }
+}
+
+void MainWindow::board3dItemClicked(int index) noexcept {
+  if (!mProject) return;
+  auto section = (mTabs[0]->row_count() + mTabs[1]->row_count()) % 2;
+  if (auto obj = mProject->getProject().getBoardByIndex(index)) {
+    mTabs[section]->push_back(
+        ui::Tab{ui::TabType::Board3d, index, q2s(*obj->getName())});
     tabClicked(section, mTabs[section]->row_count() - 1);
   }
 }
@@ -171,44 +190,71 @@ void MainWindow::tabClicked(int section, int index) noexcept {
   auto tabs = mTabs[section];
   auto tab = tabs ? tabs->row_data(index) : std::nullopt;
   bool success = false;
+  ui::SectionData data{section, index, slint::Brush()};
   if (tab) {
     if (tab->type == ui::TabType::Schematic) {
       if (auto sch = mProject->getProject().getSchematicByIndex(tab->index)) {
+        m3dSceneBuilders[section].reset();
+        m3dViews[section].reset();
         mScenes[section].reset(new SchematicGraphicsScene(
             *sch, *mLayerProvider, std::make_shared<QSet<const NetSignal*>>(),
             this));
+        data.overlay_color = q2s(Qt::black);
         success = true;
       }
-    } else if (tab->type == ui::TabType::Board) {
+    } else if (tab->type == ui::TabType::Board2d) {
       if (auto brd = mProject->getProject().getBoardByIndex(tab->index)) {
+        mPlaneBuilder->startAsynchronously(*brd);
+        m3dSceneBuilders[section].reset();
+        m3dViews[section].reset();
         mScenes[section].reset(new BoardGraphicsScene(
             *brd, *mLayerProvider, std::make_shared<QSet<const NetSignal*>>(),
             this));
+        data.overlay_color = q2s(Qt::white);
+        success = true;
+      }
+    } else if (tab->type == ui::TabType::Board3d) {
+      if (auto brd = mProject->getProject().getBoardByIndex(tab->index)) {
+        mPlaneBuilder->startAsynchronously(*brd);
+        mScenes[section].reset();
+        m3dViews[section].reset(new OpenGlView());
+        m3dViews[section]->stopSpinning(QString());
+        m3dSceneBuilders[section].reset(new OpenGlSceneBuilder(this));
+        connect(m3dSceneBuilders[section].get(),
+                &OpenGlSceneBuilder::objectAdded, m3dViews[section].get(),
+                &OpenGlView::addObject);
+        connect(m3dSceneBuilders[section].get(),
+                &OpenGlSceneBuilder::objectAdded, this, [this, section]() {
+                  (section == 0) ? mWindow->fn_refresh_scene_left():
+                  mWindow->fn_refresh_scene_right();
+                }, Qt::QueuedConnection);
+        m3dSceneBuilders[section]->start(brd->buildScene3D(tl::nullopt));
+        data.overlay_color = q2s(Qt::black);
         success = true;
       }
     }
   }
   if (success) {
     if (section == 0) {
-      mGlobals.set_tab_index_left(index);
+      mGlobals.set_section_left(data);
       mWindow->fn_refresh_scene_left();
     } else if (section == 1) {
-      mGlobals.set_tab_index_right(index);
+      mGlobals.set_section_right(data);
       mWindow->fn_refresh_scene_right();
     }
   }
 }
 
 void MainWindow::tabCloseClicked(int section, int index) noexcept {
-  auto getter = std::bind((section == 1) ? &ui::Globals::get_tab_index_right
-                                         : &ui::Globals::get_tab_index_left,
-                          &mGlobals);
+  auto getSection = std::bind((section == 1) ? &ui::Globals::get_section_right
+                                             : &ui::Globals::get_section_left,
+                              &mGlobals);
 
   if (auto tabs = mTabs[section]) {
     const int tabCount = static_cast<int>(tabs->row_count());
     if ((index >= 0) && (index < tabCount)) {
       tabs->erase(index);
-      int currentIndex = getter();
+      int currentIndex = getSection().tab_index;
       if (index < currentIndex) {
         --currentIndex;
       }
@@ -233,6 +279,9 @@ slint::Image MainWindow::renderScene(int section, float width, float height,
       scene->render(&painter, targetRect, sourceRect);
     }
     return q2s(pixmap);
+  } else if (auto view = m3dViews[section]) {
+    view->resize(width, height);
+    return q2s(view->grab());
   } else {
     return slint::Image();
   }
@@ -259,6 +308,7 @@ slint::private_api::EventResult MainWindow::onScnePointerEvent(
       mWindow->fn_refresh_scene_right();
     }
   }
+  mWindow->set_cursor_coordinate(q2s(QString("%1, %2").arg(x1).arg(y1)));
   return slint::private_api::EventResult::Accept;
 }
 
