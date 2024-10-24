@@ -261,6 +261,7 @@ void MainWindow::tabClicked(int section, int tab) noexcept {
     mSectionsData->set_row_data(section, *sectionData);
     mWindow->fn_refresh_scene(section);
   }
+  mGlobals.set_current_section(section);
 }
 
 void MainWindow::tabCloseClicked(int section, int tab) noexcept {

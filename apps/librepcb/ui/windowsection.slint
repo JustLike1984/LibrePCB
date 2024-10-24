@@ -61,6 +61,14 @@ export component WindowSection inherits Rectangle {
                         }
                     }
                 }
+
+                if (section.index == Globals.current-section) && (index == section.tab-index): Rectangle {
+                    x: 0;
+                    y: 0;
+                    width: 100%;
+                    height: 1px;
+                    background: #29d682;
+                }
             }
         }
     }
@@ -112,13 +120,5 @@ export component WindowSection inherits Rectangle {
                 }
             }
         }
-    }
-
-    if section.index == Globals.current-section: Rectangle {
-        x: 0;
-        y: tabBar.height;
-        width: 100%;
-        height: 1px;
-        background: #29d682;
     }
 }

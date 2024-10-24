@@ -35,7 +35,9 @@ add_executable(
   workspace/recentprojectsmodel.cpp
   workspace/recentprojectsmodel.h
 )
-slint_target_sources(librepcb ui/appwindow.slint NAMESPACE ui)
+slint_target_sources(
+  librepcb ui/appwindow.slint NAMESPACE ui COMPILATION_UNITS 8
+)
 target_include_directories(
   librepcb
   PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../libs"
