@@ -1,8 +1,8 @@
-import { Globals, Tab, TabType, SectionData } from "./globals.slint";
+import { Globals, Tab, TabType, WindowSection } from "./globals.slint";
 import { SceneButton } from "./scenebutton.slint";
 
 export component WindowSection inherits Rectangle {
-    in-out property <SectionData> section;
+    in-out property <WindowSection> section;
 
     tabBar := Rectangle {
         x: 0;

@@ -28,6 +28,8 @@ add_executable(
   project/projectsmodel.h
   project/schematiceditor.cpp
   project/schematiceditor.h
+  windowsectionsmodel.cpp
+  windowsectionsmodel.h
   workspace/favoriteprojectsmodel.cpp
   workspace/favoriteprojectsmodel.h
   workspace/filesystemmodel.cpp

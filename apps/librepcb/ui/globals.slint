@@ -58,7 +58,7 @@ export struct Tab {
     title: string,
 }
 
-export struct SectionData {
+export struct WindowSection {
     index: int,  // Section index (0 = left most)
     tabs: [Tab], // Tabs in this section
     tab-index: int,  // Currently opened tab in this section
@@ -238,7 +238,7 @@ export global Globals {
         },
     ];
 
-    in property <[SectionData]> sections: [
+    in property <[WindowSection]> sections: [
         {
             index: 0,
             tabs: [
