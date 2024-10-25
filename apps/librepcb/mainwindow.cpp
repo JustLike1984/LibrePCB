@@ -53,46 +53,59 @@ MainWindow::MainWindow(GuiApplication& app,
                        slint::ComponentHandle<ui::AppWindow> win, int index,
                        QObject* parent) noexcept
   : QObject(parent),
-    mApp(app),
-    mWindow(win),
-    mGlobals(mWindow->global<ui::Globals>()),
     mIndex(index),
-    mSections(new WindowSectionsModel(app, win, this)) {
+    mApp(app),
+    mSections(new WindowSectionsModel(app, this)),
+    mWindow(win) {
   // Set initial data.
-  mGlobals.set_current_project(ui::ProjectData{});
+  const ui::Globals& g = mWindow->global<ui::Globals>();
+  g.set_current_project(ui::ProjectData{});
   mWindow->set_cursor_coordinate(slint::SharedString());
 
   // Register global callbacks.
-  mGlobals.on_project_item_doubleclicked(std::bind(
+  g.on_project_item_doubleclicked(std::bind(
       &MainWindow::projectItemDoubleClicked, this, std::placeholders::_1));
-  mGlobals.on_schematic_clicked(std::bind(&MainWindow::schematicItemClicked,
-                                          this, std::placeholders::_1));
-  mGlobals.on_board_clicked(
-      std::bind(&MainWindow::boardItemClicked, this, std::placeholders::_1));
-  mGlobals.on_board_3d_clicked(std::bind(&MainWindow::board3dItemClicked, this,
-                                         std::placeholders::_1,
-                                         std::placeholders::_2));
-  mGlobals.on_tab_clicked(std::bind(&MainWindow::tabClicked, this,
-                                    std::placeholders::_1,
-                                    std::placeholders::_2));
-  mGlobals.on_tab_close_clicked(std::bind(&MainWindow::tabCloseClicked, this,
-                                          std::placeholders::_1,
-                                          std::placeholders::_2));
-  mGlobals.on_render_scene(
-      std::bind(&MainWindow::renderScene, this, std::placeholders::_1,
-                std::placeholders::_2, std::placeholders::_3,
-                std::placeholders::_4, std::placeholders::_5));
-  mGlobals.on_scene_pointer_event(
-      std::bind(&MainWindow::onScenePointerEvent, this, std::placeholders::_1,
-                std::placeholders::_2, std::placeholders::_3,
-                std::placeholders::_4, std::placeholders::_5));
-  mGlobals.on_scene_scrolled(
-      std::bind(&MainWindow::onSceneScrolled, this, std::placeholders::_1,
-                std::placeholders::_2, std::placeholders::_3,
-                std::placeholders::_4, std::placeholders::_5));
+  g.on_schematic_clicked([this](int index) {
+    if (mCurrentProject) mSections->openSchematic(mCurrentProject, index);
+  });
+  g.on_board_clicked([this](int index) {
+    if (mCurrentProject) mSections->openBoard(mCurrentProject, index);
+  });
+  g.on_board_3d_clicked(std::bind(&WindowSectionsModel::openBoard3dViewer,
+                                  mSections.get(), std::placeholders::_1,
+                                  std::placeholders::_2));
+  g.on_tab_clicked(std::bind(&WindowSectionsModel::setCurrentTab,
+                             mSections.get(), std::placeholders::_1,
+                             std::placeholders::_2));
+  g.on_tab_close_clicked(std::bind(&WindowSectionsModel::closeTab,
+                                   mSections.get(), std::placeholders::_1,
+                                   std::placeholders::_2));
+  g.on_render_scene(std::bind(&WindowSectionsModel::renderScene,
+                              mSections.get(), std::placeholders::_1,
+                              std::placeholders::_2, std::placeholders::_3,
+                              std::placeholders::_4, std::placeholders::_5));
+  g.on_scene_pointer_event(std::bind(
+      &WindowSectionsModel::processScenePointerEvent, mSections.get(),
+      std::placeholders::_1, std::placeholders::_2, std::placeholders::_3,
+      std::placeholders::_4, std::placeholders::_5));
+  g.on_scene_scrolled(std::bind(&WindowSectionsModel::processSceneScrolled,
+                                mSections.get(), std::placeholders::_1,
+                                std::placeholders::_2, std::placeholders::_3,
+                                std::placeholders::_4, std::placeholders::_5));
 
   // Set models.
-  mGlobals.set_sections(mSections);
+  g.set_sections(mSections);
+
+  // Connect model callbacks.
+  connect(mSections.get(), &WindowSectionsModel::currentSectionChanged, this,
+          [&g](int section) { g.set_current_section(section); });
+  connect(mSections.get(), &WindowSectionsModel::currentProjectChanged, this,
+          &MainWindow::setCurrentProject);
+  connect(
+      mSections.get(), &WindowSectionsModel::cursorCoordinatesChanged, this,
+      [this](qreal x, qreal y) {
+        mWindow->set_cursor_coordinate(q2s(QString("%1, %2").arg(x).arg(y)));
+      });
 
   // Show window.
   mWindow->show();
@@ -113,25 +126,7 @@ void MainWindow::projectItemDoubleClicked(
     return;
   }
   if ((fp.getSuffix() == "lpp") || (fp.getSuffix() == "lppz")) {
-    mProject = mApp.getProjects().openProject(fp);
-    auto schematics =
-        std::make_shared<slint::VectorModel<slint::SharedString>>();
-    auto boards = std::make_shared<slint::VectorModel<slint::SharedString>>();
-
-    for (auto sch : mProject->getProject().getSchematics()) {
-      schematics->push_back(q2s(*sch->getName()));
-    }
-
-    for (auto brd : mProject->getProject().getBoards()) {
-      boards->push_back(q2s(*brd->getName()));
-    }
-
-    mGlobals.set_current_project(ui::ProjectData{
-        true,
-        q2s(*mProject->getProject().getName()),
-        schematics,
-        boards,
-    });
+    setCurrentProject(mApp.getProjects().openProject(fp));
     mWindow->set_page(ui::MainPage::Project);
   } else {
     DesktopServices ds(mApp.getWorkspace().getSettings(), nullptr);
@@ -139,17 +134,30 @@ void MainWindow::projectItemDoubleClicked(
   }
 }
 
-void MainWindow::schematicItemClicked(int index) noexcept {
-  if (!mProject) return;
-  if (auto obj = mProject->getProject().getSchematicByIndex(index)) {
-    addTab(ui::TabType::Schematic, *obj->getName(), index);
-  }
-}
+void MainWindow::setCurrentProject(
+    std::shared_ptr<ProjectEditor> prj) noexcept {
+  if (prj != mCurrentProject) {
+    mCurrentProject = prj;
 
-void MainWindow::boardItemClicked(int index) noexcept {
-  if (!mProject) return;
-  if (auto obj = mProject->getProject().getBoardByIndex(index)) {
-    addTab(ui::TabType::Board2d, *obj->getName(), index);
+    auto schematics =
+        std::make_shared<slint::VectorModel<slint::SharedString>>();
+    auto boards = std::make_shared<slint::VectorModel<slint::SharedString>>();
+
+    for (auto sch : mCurrentProject->getProject().getSchematics()) {
+      schematics->push_back(q2s(*sch->getName()));
+    }
+
+    for (auto brd : mCurrentProject->getProject().getBoards()) {
+      boards->push_back(q2s(*brd->getName()));
+    }
+
+    const ui::Globals& g = mWindow->global<ui::Globals>();
+    g.set_current_project(ui::ProjectData{
+        true,
+        q2s(*mCurrentProject->getProject().getName()),
+        schematics,
+        boards,
+    });
   }
 }
 

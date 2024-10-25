@@ -63,15 +63,13 @@ public:
 
 private:
   void projectItemDoubleClicked(const slint::SharedString& path) noexcept;
-  void schematicItemClicked(int index) noexcept;
-  void boardItemClicked(int index) noexcept;
+  void setCurrentProject(std::shared_ptr<ProjectEditor> prj) noexcept;
 
-  GuiApplication& mApp;
-  slint::ComponentHandle<ui::AppWindow> mWindow;
-  const ui::Globals& mGlobals;
   const int mIndex;
-  std::shared_ptr<ProjectEditor> mProject;
+  GuiApplication& mApp;
   std::shared_ptr<WindowSectionsModel> mSections;
+  std::shared_ptr<ProjectEditor> mCurrentProject;
+  slint::ComponentHandle<ui::AppWindow> mWindow;
 };
 
 /*******************************************************************************

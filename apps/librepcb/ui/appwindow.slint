@@ -71,10 +71,6 @@ export component AppWindow inherits Window {
         height: sidebar.height;
     }
 
-    public function refresh-scene(section: int) {
-        Globals.sections[section].frame += 1;
-    }
-
     HorizontalLayout {
         x: sidebar.width + panel-width;
         y: sidebar.y + 1px;

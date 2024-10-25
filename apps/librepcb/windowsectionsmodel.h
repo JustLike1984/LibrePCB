@@ -88,15 +88,33 @@ public:
     QMatrix4x4 mousePressTransform;
     QPointF mousePressCenter;
     QSet<slint::private_api::PointerEventButton> buttons;
+
+    Tab* getTab(int index) noexcept {
+      return ((index >= 0) && (index < tabs.count())) ? &tabs[index] : nullptr;
+    }
   };
 
   // Constructors / Destructor
   WindowSectionsModel() = delete;
   WindowSectionsModel(const WindowSectionsModel& other) = delete;
   explicit WindowSectionsModel(GuiApplication& app,
-                               slint::ComponentHandle<ui::AppWindow> win,
                                QObject* parent = nullptr) noexcept;
   virtual ~WindowSectionsModel() noexcept;
+
+  // General Methods
+  void openSchematic(std::shared_ptr<ProjectEditor> prj, int index) noexcept;
+  void openBoard(std::shared_ptr<ProjectEditor> prj, int index) noexcept;
+  void openBoard3dViewer(int section, int tab) noexcept;
+  void setCurrentTab(int section, int tab) noexcept;
+  void closeTab(int section, int tab) noexcept;
+  slint::Image renderScene(int section, int tab, float width, float height,
+                           int frame) noexcept;
+  slint::private_api::EventResult processScenePointerEvent(
+      int section, int tab, float x, float y,
+      slint::private_api::PointerEvent e) noexcept;
+  slint::private_api::EventResult processSceneScrolled(
+      int section, int tab, float x, float y,
+      slint::private_api::PointerScrollEvent e) noexcept;
 
   // Implementations
   std::size_t row_count() const override;
@@ -105,24 +123,23 @@ public:
   // Operator Overloadings
   WindowSectionsModel& operator=(const WindowSectionsModel& rhs) = delete;
 
+signals:
+  void currentSectionChanged(int section);
+  void currentProjectChanged(std::shared_ptr<ProjectEditor> prj);
+  void cursorCoordinatesChanged(qreal x, qreal y);
+
 private:
-  void board3dItemClicked(int section, int tab) noexcept;
-  void addTab(ui::TabType type, const QString& title, int objIndex) noexcept;
-  void tabClicked(int section, int tab) noexcept;
-  void tabCloseClicked(int section, int tab) noexcept;
-  slint::Image renderScene(int section, int tab, float width, float height,
-                           int frame) noexcept;
-  slint::private_api::EventResult onScenePointerEvent(
-      int section, int tab, float x, float y,
-      slint::private_api::PointerEvent e) noexcept;
-  slint::private_api::EventResult onSceneScrolled(
-      int section, int tab, float x, float y,
-      slint::private_api::PointerScrollEvent e) noexcept;
+  void addTab(std::shared_ptr<ProjectEditor> prj, ui::TabType type,
+              const QString& title, int objIndex) noexcept;
+  Section* getSection(int index) noexcept {
+    return ((index >= 0) && (index < mItems.count())) ? &mItems[index]
+                                                      : nullptr;
+  }
 
   GuiApplication& mApp;
-  slint::ComponentHandle<ui::AppWindow> mWindow;
   std::unique_ptr<IF_GraphicsLayerProvider> mLayerProvider;
   std::unique_ptr<BoardPlaneFragmentsBuilder> mPlaneBuilder;
+  int mCurrentSection;
   QList<Section> mItems;
 };
 
