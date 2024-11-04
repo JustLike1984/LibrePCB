@@ -6,8 +6,9 @@ if(EXISTS "${SLINT_SUBMODULE_BASEPATH}"
   message(STATUS "Using vendored Slint")
 
   # Set compile options
-  set(SLINT_FEATURE_BACKEND_QT ON)
-  set(SLINT_FEATURE_BACKEND_WINIT OFF)
+  set(SLINT_FEATURE_BACKEND_QT OFF)
+  set(SLINT_FEATURE_RENDERER_SKIA ON)
+  set(SLINT_FEATURE_BACKEND_WINIT ON)
 
   # Include local submodule
   set(BUILD_SHARED_LIBS ON)
