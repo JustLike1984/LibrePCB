@@ -100,6 +100,7 @@ public:
   void zoomIn() noexcept;
   void zoomOut() noexcept;
   void zoomToSceneRect(const QRectF& r) noexcept;
+  void stopToolTipTimer() noexcept;
 
   // Operator Overloadings
   SlintGraphicsView& operator=(const SlintGraphicsView& rhs) = delete;
@@ -107,6 +108,7 @@ public:
 signals:
   void stateChanged();
   void transformChanged();
+  void toolTipRequested();
 
 private:  // Methods
   void scroll(const QPointF& delta) noexcept;
@@ -129,6 +131,8 @@ private:  // Data
   Projection mAnimationDataStart;
   Projection mAnimationDataDelta;
   std::unique_ptr<QVariantAnimation> mAnimation;
+
+  QTimer mToolTipTimer;
 };
 
 /*******************************************************************************

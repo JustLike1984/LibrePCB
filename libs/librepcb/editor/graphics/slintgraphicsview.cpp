@@ -60,6 +60,7 @@ SlintGraphicsView::SlintGraphicsView(QObject* parent) noexcept
             applyProjection(mAnimationDataStart.interpolated(
                 mAnimationDataDelta, value.toReal()));
           });
+  connect(&mToolTipTimer, &QTimer::timeout, this, &SlintGraphicsView::toolTipRequested);
 }
 
 SlintGraphicsView::~SlintGraphicsView() noexcept {
@@ -201,6 +202,7 @@ bool SlintGraphicsView::pointerEvent(
       const qreal distance = std::sqrt(d.x() * d.x() + d.y() * d.y());
       if (distance > 5) {
         mPanning = true;
+        stopToolTipTimer();
         emit stateChanged();
       }
     }
@@ -210,6 +212,7 @@ bool SlintGraphicsView::pointerEvent(
       applyProjection(projection);
       return true;
     } else if (mEventHandler) {
+      mToolTipTimer.start(1000);
       return mEventHandler->graphicsSceneMouseMoved(mMouseEvent);
     }
   }
@@ -289,6 +292,10 @@ void SlintGraphicsView::zoomToSceneRect(const QRectF& r) noexcept {
   projection.offset =
       sourceRect.center() - (targetRect.center() / projection.scale);
   smoothTo(projection);
+}
+
+void SlintGraphicsView::stopToolTipTimer() noexcept {
+  mToolTipTimer.stop();
 }
 
 /*******************************************************************************

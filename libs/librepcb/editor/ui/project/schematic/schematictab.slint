@@ -423,6 +423,29 @@ export component SchematicTab inherits Tab {
             }
         }
 
+        if self.has-hover && (!tabs[index].tooltip.title.is-empty): Rectangle {
+            //x: parent.mouse-x;
+            //y: parent.mouse-y;
+            width: 200px;
+            height: 30px;
+            background: red;
+            opacity: 0;
+
+            init => {
+                self.x = parent.mouse-x;
+                self.y = parent.mouse-y;
+                self.opacity = 1;
+            }
+
+            animate opacity { duration: 300ms; }
+        }
+
+        changed has-hover => {
+            if !self.has-hover {
+                tabs[index].tooltip = { };
+            }
+        }
+
         pointer-event(event) => {
             if event.kind == PointerEventKind.down {
                 Data.set-current-tab(section-index, index);

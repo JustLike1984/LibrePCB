@@ -204,6 +204,8 @@ private:
 
   // Objects in active state
   std::unique_ptr<SchematicGraphicsScene> mScene;
+
+  QString mToolTip;
 };
 
 /*******************************************************************************

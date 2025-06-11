@@ -147,6 +147,8 @@ SchematicTab::SchematicTab(GuiApplication& app, SchematicEditor& editor,
           &SchematicTab::requestRepaint);
   connect(mView.get(), &SlintGraphicsView::stateChanged, this,
           [this]() { onDerivedUiDataChanged.notify(); });
+  connect(mView.get(), &SlintGraphicsView::toolTipRequested, this,
+          [this]() { mToolTip = "Foo"; onDerivedUiDataChanged.notify();});
 
   // Connect schematic editor.
   connect(&mSchematicEditor, &SchematicEditor::uiIndexChanged, this,
@@ -322,6 +324,10 @@ ui::SchematicTabData SchematicTab::getDerivedUiData() const noexcept {
           static_cast<int>(mToolAttributeUnitsQt.indexOf(
               mToolAttributeUnit)),  // Current index
       },
+      ui::ToolTipData{
+        q2s(mToolTip),
+            slint::SharedString(),
+      },
       q2s(mSceneImagePos),  // Scene image position
       mFrameIndex,  // Frame index
   };
@@ -369,6 +375,8 @@ void SchematicTab::setDerivedUiData(const ui::SchematicTabData& data) noexcept {
       mToolAttributeUnitsQt.value(data.tool_attribute_unit.current_index));
   emit attributeValueRequested(
       toMultiLine(s2q(data.tool_attribute_value.text)));
+
+  mToolTip = s2q(data.tooltip.title);
 
   requestRepaint();
 }

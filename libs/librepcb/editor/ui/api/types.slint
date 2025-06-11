@@ -88,6 +88,11 @@ export struct GraphicsLayerData {
     visible: bool,
 }
 
+export struct ToolTipData {
+    title: string,
+    description: string,
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Widgets data
 ////////////////////////////////////////////////////////////////////////////////
@@ -448,6 +453,7 @@ export struct SchematicTabData {
     tool-attribute-value: LineEditData,
     tool-attribute-unit: ComboBoxData,
 
+    tooltip: ToolTipData,
     scene-image-pos: Point,  // Absolute position of graphics scene
     frame: int,  // Frame index to trigger repainting
 }
