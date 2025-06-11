@@ -30,6 +30,9 @@
  *  Namespace / Forward Declarations
  ******************************************************************************/
 namespace librepcb {
+
+class Point;
+
 namespace editor {
 
 struct GraphicsSceneKeyEvent;
@@ -82,6 +85,9 @@ public:
       const GraphicsSceneMouseEvent& e) noexcept {
     Q_UNUSED(e);
     return false;
+  }
+  virtual void graphicsSceneToolTipEvent(const std::optional<Point>& pos) noexcept {
+    Q_UNUSED(pos);
   }
 };
 

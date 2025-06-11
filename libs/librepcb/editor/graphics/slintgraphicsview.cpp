@@ -60,7 +60,11 @@ SlintGraphicsView::SlintGraphicsView(QObject* parent) noexcept
             applyProjection(mAnimationDataStart.interpolated(
                 mAnimationDataDelta, value.toReal()));
           });
-  connect(&mToolTipTimer, &QTimer::timeout, this, &SlintGraphicsView::toolTipRequested);
+  connect(&mToolTipTimer, &QTimer::timeout, this, [this](){
+    if (mEventHandler) {
+      mEventHandler->graphicsSceneToolTipEvent(mMouseEvent.scenePos);
+    }
+  });
 }
 
 SlintGraphicsView::~SlintGraphicsView() noexcept {
@@ -150,6 +154,10 @@ bool SlintGraphicsView::pointerEvent(
     mMouseEvent.buttons.setFlag(s2q(e.button), false);
   }
 
+  if (mEventHandler) {
+    mEventHandler->graphicsSceneToolTipEvent(std::nullopt);
+  }
+
   if ((e.button == PointerEventButton::Left) &&
       (e.kind == PointerEventKind::Down)) {
     if (mEventHandler) {
@@ -202,7 +210,7 @@ bool SlintGraphicsView::pointerEvent(
       const qreal distance = std::sqrt(d.x() * d.x() + d.y() * d.y());
       if (distance > 5) {
         mPanning = true;
-        stopToolTipTimer();
+        mToolTipTimer.stop();
         emit stateChanged();
       }
     }
@@ -254,6 +262,10 @@ bool SlintGraphicsView::keyEvent(
   return false;
 }
 
+void SlintGraphicsView::mouseLeaveEvent() noexcept {
+  mToolTipTimer.stop();
+}
+
 void SlintGraphicsView::scrollLeft() noexcept {
   scroll(QPointF(-mViewSize.width() * sScrollFactor / mProjection.scale, 0));
 }
@@ -292,10 +304,6 @@ void SlintGraphicsView::zoomToSceneRect(const QRectF& r) noexcept {
   projection.offset =
       sourceRect.center() - (targetRect.center() / projection.scale);
   smoothTo(projection);
-}
-
-void SlintGraphicsView::stopToolTipTimer() noexcept {
-  mToolTipTimer.stop();
 }
 
 /*******************************************************************************

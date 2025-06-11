@@ -147,8 +147,6 @@ SchematicTab::SchematicTab(GuiApplication& app, SchematicEditor& editor,
           &SchematicTab::requestRepaint);
   connect(mView.get(), &SlintGraphicsView::stateChanged, this,
           [this]() { onDerivedUiDataChanged.notify(); });
-  connect(mView.get(), &SlintGraphicsView::toolTipRequested, this,
-          [this]() { mToolTip = "Foo"; onDerivedUiDataChanged.notify();});
 
   // Connect schematic editor.
   connect(&mSchematicEditor, &SchematicEditor::uiIndexChanged, this,
@@ -324,10 +322,7 @@ ui::SchematicTabData SchematicTab::getDerivedUiData() const noexcept {
           static_cast<int>(mToolAttributeUnitsQt.indexOf(
               mToolAttributeUnit)),  // Current index
       },
-      ui::ToolTipData{
-        q2s(mToolTip),
-            slint::SharedString(),
-      },
+      mToolTip, // Tooltip
       q2s(mSceneImagePos),  // Scene image position
       mFrameIndex,  // Frame index
   };
@@ -376,8 +371,6 @@ void SchematicTab::setDerivedUiData(const ui::SchematicTabData& data) noexcept {
   emit attributeValueRequested(
       toMultiLine(s2q(data.tool_attribute_value.text)));
 
-  mToolTip = s2q(data.tooltip.title);
-
   requestRepaint();
 }
 
@@ -406,6 +399,10 @@ void SchematicTab::deactivate() noexcept {
 
 void SchematicTab::trigger(ui::TabAction a) noexcept {
   switch (a) {
+    case ui::TabAction::MouseLeave: {
+      mView->mouseLeaveEvent();
+      break;
+    }
     case ui::TabAction::Print: {
       execGraphicsExportDialog(GraphicsExportDialog::Output::Print, "print");
       break;
@@ -689,6 +686,21 @@ bool SchematicTab::graphicsSceneLeftMouseButtonDoubleClicked(
 bool SchematicTab::graphicsSceneRightMouseButtonReleased(
     const GraphicsSceneMouseEvent& e) noexcept {
   return mFsm->processGraphicsSceneRightMouseButtonReleased(e);
+}
+
+void SchematicTab::graphicsSceneToolTipEvent(const std::optional<Point>& pos) noexcept {
+  if ((!pos) && (!mToolTip.title.empty())) {
+    mToolTip = ui::ToolTipData{};
+    onDerivedUiDataChanged.notify();
+  } else if (pos && mToolTip.title.empty() && mScene) {
+    if (auto item = mScene->itemAt(pos->toPxQPointF(), QTransform())) {
+      const QString tt = item->toolTip();
+      if (!tt.isEmpty()) {
+        mToolTip.title = q2s(tt);
+        onDerivedUiDataChanged.notify();
+      }
+    }
+  }
 }
 
 /*******************************************************************************

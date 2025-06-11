@@ -423,18 +423,45 @@ export component SchematicTab inherits Tab {
             }
         }
 
-        if self.has-hover && (!tabs[index].tooltip.title.is-empty): Rectangle {
-            //x: parent.mouse-x;
-            //y: parent.mouse-y;
-            width: 200px;
-            height: 30px;
-            background: red;
+        if !tabs[index].tooltip.title.is-empty: TouchArea {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: max(min(self.preferred-width, 500px), 200px);
+            height: self.preferred-height;
             opacity: 0;
 
+            VerticalLayout {
+                padding-left: 15px;
+                padding-top: 15px;
+
+                Rectangle {
+                    background: black;
+                    border-radius: 5px;
+
+                    VerticalLayout {
+                        padding: 5px;
+                        spacing: 5px;
+
+                        Text {
+                            font-size: 13px;
+                            font-weight: 600;
+                            text: tabs[index].tooltip.title;
+                        }
+
+                        Text {
+                            font-size: 12px;
+                            text: tabs[index].tooltip.description;
+                        }
+                    }
+                }
+            }
+
             init => {
-                self.x = parent.mouse-x;
-                self.y = parent.mouse-y;
-                self.opacity = 1;
+                if parent.has-hover {
+                    self.x = parent.mouse-x;
+                    self.y = parent.mouse-y;
+                }
+                self.opacity = 0.8;
             }
 
             animate opacity { duration: 300ms; }
@@ -442,7 +469,7 @@ export component SchematicTab inherits Tab {
 
         changed has-hover => {
             if !self.has-hover {
-                tabs[index].tooltip = { };
+                Backend.trigger-tab(section-index, index, TabAction.mouse-leave);
             }
         }
 

@@ -108,6 +108,7 @@ public:
       const GraphicsSceneMouseEvent& e) noexcept override;
   bool graphicsSceneRightMouseButtonReleased(
       const GraphicsSceneMouseEvent& e) noexcept override;
+  void graphicsSceneToolTipEvent(const std::optional<Point>& pos) noexcept override;
 
   // SchematicEditorFsmAdapter
   SchematicGraphicsScene* fsmGetGraphicsScene() noexcept override;
@@ -174,6 +175,7 @@ private:
   // State
   SearchContext mSearchContext;
   Theme::GridStyle mGridStyle;
+  ui::ToolTipData mToolTip;
   QPointF mSceneImagePos;
   int mFrameIndex;
 
@@ -204,8 +206,6 @@ private:
 
   // Objects in active state
   std::unique_ptr<SchematicGraphicsScene> mScene;
-
-  QString mToolTip;
 };
 
 /*******************************************************************************
